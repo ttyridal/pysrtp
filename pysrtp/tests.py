@@ -20,7 +20,12 @@ class srtp_tests(unittest.TestCase):
         '69 61 20 65 73 74 20 6f  6d 6e 69 73 20 64 69 76'
         '69 73 61 20 69 6e 20 70  61 72 74 65 73 20 74 72'
         '65 73').replace(' ', ''))
-    libsrtp_gcm_protected_rtcp = unhexlify((
+    gcm_protected_rtcp = unhexlify((
+        '81 c8 00 05 de ad be ef  1f d6 ff 53 aa 58 17 ea'
+        '0b ce e1 28 14 ad 0a c7  cc 2c 9e 75 c4 d4 a4 30'
+        '61 a4 e4 d3 73 0e 81 20  b0 69 3a 47 80 00 00 01'
+        ).replace(' ', ''))
+    libsrtp_bug_gcm_protected_rtcp = unhexlify((
         '81 c8 00 05 de ad be ef  1f d6 ff 53 aa 58 17 ea '
         '0b ce e1 28 14 ad 0a c7  cc 2c 9e 75 10 7c 6c a2 '
         '2b 64 f0 4e ec 0c 98 f1  12 34 44 d1 80 00 00 01'
@@ -50,6 +55,20 @@ class srtp_tests(unittest.TestCase):
         x = srtp.protectRtcp(self.unprotected_rtcp)
         self.assertEqual(x[:-20], self.unprotected_rtcp)
         self.assertEqual(x[-20:], unhexlify(
+            'a6bf3a31f30d4575fa06e819354ec39d00000001'))
+        dta = srtp.unprotectRtcp(x)
+        self.assertEqual(dta, self.unprotected_rtcp)
+
+    def test_gcm_unencrypted_rtcp_bug(self):
+        srtp = pysrtp.SRTP(
+            'AEAD_AES_128_GCM',
+            b'\0'*16, b'\0'*14,
+            ['UNENCRYPTED_SRTCP'])
+        srtp.libsrtp_bug = True
+
+        x = srtp.protectRtcp(self.unprotected_rtcp)
+        self.assertEqual(x[:-20], self.unprotected_rtcp)
+        self.assertEqual(x[-20:], unhexlify(
             '3959f1a052f2473e2021574f8eff24ce00000001'))
         dta = srtp.unprotectRtcp(x)
         self.assertEqual(dta, self.unprotected_rtcp)
@@ -74,17 +93,47 @@ class srtp_tests(unittest.TestCase):
         self.assertEqual(x, self.gcm_protected_rtp)
 
         x = srtp.protectRtcp(self.unprotected_rtcp)
-        self.assertEqual(x, self.libsrtp_gcm_protected_rtcp)
+        self.assertEqual(x, self.gcm_protected_rtcp)
+
+    def test_aes_gcm_protect_libsrtp_bug(self):
+        srtp = pysrtp.SRTP('AEAD_AES_128_GCM', b'\0'*16, b'\0'*14)
+        srtp.libsrtp_bug = True
+
+        x = srtp.protectRtp(self.unprotected_rtp)
+        self.assertEqual(x, self.gcm_protected_rtp)
+
+        x = srtp.protectRtcp(self.unprotected_rtcp)
+        self.assertEqual(x, self.libsrtp_bug_gcm_protected_rtcp)
 
     def test_aes_gcm_unprotect(self):
         srtp = pysrtp.SRTP('AEAD_AES_128_GCM', b'\0'*16, b'\0'*14)
 
-        tampered = bytearray(self.libsrtp_gcm_protected_rtcp)
+        tampered = bytearray(self.gcm_protected_rtcp)
         tampered[4] += 1
         with self.assertRaises(errors.AuthenticationFailure):
             srtp.unprotectRtcp(tampered)
 
-        res = srtp.unprotectRtcp(self.libsrtp_gcm_protected_rtcp)
+        res = srtp.unprotectRtcp(self.gcm_protected_rtcp)
+        self.assertEqual(res, self.unprotected_rtcp)
+
+        tampered = bytearray(self.gcm_protected_rtp)
+        tampered[4] += 1
+        with self.assertRaises(errors.AuthenticationFailure):
+            srtp.unprotectRtp(tampered)
+
+        res = srtp.unprotectRtp(self.gcm_protected_rtp)
+        self.assertEqual(res, self.unprotected_rtp)
+
+    def test_aes_gcm_unprotect_libsrtp_bug(self):
+        srtp = pysrtp.SRTP('AEAD_AES_128_GCM', b'\0'*16, b'\0'*14)
+        srtp.libsrtp_bug = True
+
+        tampered = bytearray(self.gcm_protected_rtcp)
+        tampered[4] += 1
+        with self.assertRaises(errors.AuthenticationFailure):
+            srtp.unprotectRtcp(tampered)
+
+        res = srtp.unprotectRtcp(self.libsrtp_bug_gcm_protected_rtcp)
         self.assertEqual(res, self.unprotected_rtcp)
 
         tampered = bytearray(self.gcm_protected_rtp)

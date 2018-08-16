@@ -13,7 +13,7 @@ class SRTP(object):
     def __init__(self, alg, master_key, master_salt, flags={}, **kwargs):
         if alg == 'AEAD_AES_128_GCM':
             self.keys = aes128_gcm.derive_keys(master_key, master_salt)
-            self.libsrtp_bug = True
+            self.libsrtp_bug = False
             self.tag_len = 16
             self.protectRtcp = self._protectRtcp_aead
             self.unprotectRtcp = self._unprotectRtcp_aead
